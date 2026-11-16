@@ -169,8 +169,10 @@ def validate_narrative(narrative: str, facts: FactSheet) -> ValidationResult:
         if not mentions:
             continue
 
-        # Direction claims, each attached to the nearest metric.
-        # Use the first mentioned metric's polarity to seed; re-resolve per attached metric.
+        # Direction claims. A sentence can mention several metrics ("revenue climbed
+        # while CPA rose"), so each direction word is attached to the nearest metric
+        # mention before it. Polarity words ("improved") resolve differently per metric,
+        # so we scan once per mentioned metric and keep only the claims attached to it.
         seen: set[tuple[str, int]] = set()
         for _, _, key in mentions:
             metric = facts.get(key)
