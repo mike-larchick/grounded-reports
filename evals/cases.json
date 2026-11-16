@@ -1,0 +1,79 @@
+[
+  {
+    "id": "correct_baseline",
+    "description": "Every claim matches the fact sheet.",
+    "narrative": "Sessions rose 16.2% week over week while signups declined 10.1%. Revenue climbed 7.9% and cost increased 7.5%. Cost per signup rose 19.6%, and the conversion rate softened.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "flipped_direction_signups",
+    "description": "Signups are DOWN; narrative says they grew.",
+    "narrative": "Sessions rose 16.2% week over week and signups grew as well. Revenue climbed and cost increased.",
+    "expect_ok": false,
+    "expect_kinds": ["direction_mismatch"]
+  },
+  {
+    "id": "polarity_trap_cpa_improved",
+    "description": "Cost per signup went UP (worse). 'Improved' on a lower-is-better metric means DOWN, so this is wrong.",
+    "narrative": "Cost per signup improved this period, landing at $43.88.",
+    "expect_ok": false,
+    "expect_kinds": ["direction_mismatch"]
+  },
+  {
+    "id": "polarity_correct_cpa_worsened",
+    "description": "Same metric, correctly described.",
+    "narrative": "Cost per signup worsened, rising 19.6% to $43.88.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "wrong_percent",
+    "description": "Direction right, number hallucinated.",
+    "narrative": "Sessions were up 26% compared with the prior week.",
+    "expect_ok": false,
+    "expect_kinds": ["percent_mismatch"]
+  },
+  {
+    "id": "percent_within_tolerance",
+    "description": "Rounded percent within 1.5 points is accepted.",
+    "narrative": "Sessions were up 16% compared with the prior week.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "two_metrics_one_sentence",
+    "description": "Each direction word attaches to the nearest preceding metric.",
+    "narrative": "Revenue climbed while cost per signup rose, a mixed result.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "two_metrics_one_wrong",
+    "description": "First claim right, second wrong.",
+    "narrative": "Revenue climbed while cost per signup fell, a strong result.",
+    "expect_ok": false,
+    "expect_kinds": ["direction_mismatch"]
+  },
+  {
+    "id": "level_not_change_percent",
+    "description": "'conversion rate of 3.2%' is a level, not a change; must not be flagged.",
+    "narrative": "The conversion rate came in at 3.2%, down from the prior period.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "level_from_level_percent",
+    "description": "'to 3.2% from 4.1%' are both levels of a percent-unit metric; only '22.6%' is a change claim.",
+    "narrative": "Conversion rate decreased 22.6% to 3.2% from 4.1%.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "no_metric_claims",
+    "description": "Sentences without metrics are ignored.",
+    "narrative": "A busier period overall. The team should review next week.",
+    "expect_ok": true,
+    "expect_kinds": []
+  }
+]
