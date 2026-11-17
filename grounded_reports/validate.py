@@ -50,6 +50,19 @@ BETTER_WORDS = ["improved", "improvement", "strengthened", "healthier", "better"
 WORSE_WORDS = ["worsened", "weakened", "deteriorated", "worse", "less efficient"]
 FLAT_WORDS = ["flat", "unchanged", "steady", "held steady", "stable", "level"]
 
+# "did not grow", "didn't fall", "never improved", "no increase" — a negator within a few
+# words before a direction word inverts it (up <-> down). A negated "flat" is ambiguous
+# ("not flat" = moved, direction unknown) and is dropped rather than guessed.
+NEGATORS = ["not", "n't", "never", "no", "without", "hardly", "barely"]
+NEGATION_WINDOW_WORDS = 3
+
+# "a 16% rise in sessions" — percent precedes its metric, joined by a change noun + preposition.
+PCT_FORWARD_RE = re.compile(
+    r"^\s*(?:rise|increase|gain|growth|jump|lift|improvement|drop|decline|decrease|fall|"
+    r"pullback|reduction|change|swing)?\s*(?:in|for|to|on)\s*$",
+    re.IGNORECASE,
+)
+
 PCT_RE = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s?%")
 PCT_TOLERANCE_POINTS = 1.5
 
@@ -127,21 +140,39 @@ def _metric_mentions(sentence: str) -> list[tuple[int, int, str]]:
     return hits
 
 
+def _is_negated(sentence: str, pos: int) -> bool:
+    """True if a negator appears within NEGATION_WINDOW_WORDS before `pos`."""
+    before = sentence[:pos].lower()
+    tail = re.findall(r"[a-z']+", before)[-NEGATION_WINDOW_WORDS:]
+    return any(n in w or w == n for w in tail for n in NEGATORS)
+
+
 def _direction_claims(sentence: str, metric: Metric) -> list[tuple[int, str]]:
-    """(position, resolved_direction) for every direction word in the sentence."""
-    claims: list[tuple[int, str]] = []
+    """(position, resolved_direction) for every direction word in the sentence.
+
+    Negation inverts up/down ("did not grow" -> down). A negated flat is dropped.
+    """
+    raw: list[tuple[int, str]] = []
     for pos, _ in _find_all(sentence, UP_WORDS):
-        claims.append((pos, "up"))
+        raw.append((pos, "up"))
     for pos, _ in _find_all(sentence, DOWN_WORDS):
-        claims.append((pos, "down"))
+        raw.append((pos, "down"))
     for pos, _ in _find_all(sentence, FLAT_WORDS):
-        claims.append((pos, "flat"))
+        raw.append((pos, "flat"))
     better_means = "up" if metric.polarity == "higher_is_better" else "down"
     worse_means = "down" if better_means == "up" else "up"
     for pos, _ in _find_all(sentence, BETTER_WORDS):
-        claims.append((pos, better_means))
+        raw.append((pos, better_means))
     for pos, _ in _find_all(sentence, WORSE_WORDS):
-        claims.append((pos, worse_means))
+        raw.append((pos, worse_means))
+
+    claims: list[tuple[int, str]] = []
+    for pos, d in raw:
+        if _is_negated(sentence, pos):
+            if d == "flat":
+                continue
+            d = "down" if d == "up" else "up"
+        claims.append((pos, d))
     claims.sort()
     return claims
 
@@ -154,6 +185,18 @@ def _nearest_metric(pos: int, mentions: list[tuple[int, int, str]]) -> str | Non
     if before:
         return max(before, key=lambda m: m[0])[2]
     return min(mentions, key=lambda m: abs(m[0] - pos))[2]
+
+
+def _attach_percent(sentence: str, pct_end: int, mentions: list[tuple[int, int, str]]) -> str | None:
+    """Percent claims usually follow their metric ("sessions rose 16%"), but "a 16% rise in
+    sessions" puts the metric after. If the text between the percent and the next metric is
+    just a change-noun + preposition, attach forward; otherwise fall back to nearest-before."""
+    after = [m for m in mentions if m[0] >= pct_end]
+    if after:
+        nxt = min(after, key=lambda m: m[0])
+        if PCT_FORWARD_RE.match(sentence[pct_end:nxt[0]]):
+            return nxt[2]
+    return _nearest_metric(pct_end, mentions)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +243,7 @@ def validate_narrative(narrative: str, facts: FactSheet) -> ValidationResult:
 
         # Percent claims, each attached to the nearest metric.
         for m in PCT_RE.finditer(sentence):
-            attached = _nearest_metric(m.start(), mentions)
+            attached = _attach_percent(sentence, m.end(), mentions)
             if attached is None:
                 continue
             metric = facts.get(attached)

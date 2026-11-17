@@ -70,6 +70,57 @@
     "expect_kinds": []
   },
   {
+    "id": "negation_inverts_direction",
+    "description": "Signups are DOWN. 'did not grow' is a correct (negated) claim and must not be flagged.",
+    "narrative": "Signups did not grow this week.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "negation_wrong_direction",
+    "description": "Sessions are UP. 'didn't increase' is a negated up-claim, i.e. down, which is wrong.",
+    "narrative": "Sessions didn't increase compared with last week.",
+    "expect_ok": false,
+    "expect_kinds": ["direction_mismatch"]
+  },
+  {
+    "id": "negated_flat_is_dropped",
+    "description": "'not flat' says it moved but not which way; the validator makes no claim rather than guessing.",
+    "narrative": "Revenue was not flat this period.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "percent_before_metric",
+    "description": "Percent precedes its metric ('a 16.2% rise in sessions') after a different metric; must attach forward, not to revenue.",
+    "narrative": "Revenue climbed 7.9%, and a 16.2% rise in sessions followed.",
+    "expect_ok": true,
+    "expect_kinds": []
+  },
+  {
+    "id": "percent_before_metric_wrong",
+    "description": "Same structure, hallucinated number — must still be caught against the forward metric.",
+    "narrative": "Revenue climbed 7.9%, and a 30% rise in sessions followed.",
+    "expect_ok": false,
+    "expect_kinds": ["percent_mismatch"]
+  },
+  {
+    "id": "known_limitation_spelled_out_percent",
+    "description": "KNOWN LIMITATION: spelled-out numbers ('sixteen percent') are not parsed, so a wrong value passes. Documented, not yet handled.",
+    "narrative": "Sessions were up forty percent.",
+    "expect_ok": true,
+    "expect_kinds": [],
+    "known_limitation": true
+  },
+  {
+    "id": "known_limitation_implicit_subject",
+    "description": "KNOWN LIMITATION: a direction word with no metric in the sentence ('It fell sharply.') cannot be attributed and is skipped.",
+    "narrative": "Sessions set a new high. It fell sharply.",
+    "expect_ok": true,
+    "expect_kinds": [],
+    "known_limitation": true
+  },
+  {
     "id": "no_metric_claims",
     "description": "Sentences without metrics are ignored.",
     "narrative": "A busier period overall. The team should review next week.",

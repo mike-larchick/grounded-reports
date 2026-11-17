@@ -1,10 +1,14 @@
 # grounded-reports
 
-LLM-written performance summaries that are **not allowed to be wrong about the numbers**.
+LLM-written performance summaries with a deterministic gate on the numbers: every direction
+word and percentage the model writes about a known metric is checked against pre-computed facts
+before anything ships.
 
-A small, runnable distillation of a pattern I run in production: pre-compute the facts, let the
-model write the prose, then validate every quantitative claim before anything ships — and retry
-or fall back when it doesn't pass.
+A small, runnable distillation of a pattern I run in production: compute the facts in code, let
+the model write the prose, validate the claim patterns the gate knows about, and retry or fall
+back when it doesn't pass. It catches the failure modes that actually show up — flipped
+direction, hallucinated percentages, polarity traps — not every possible falsehood. The
+[Known limitations](#known-limitations) section says exactly where it stops.
 
 ```
 daily metrics ──▶ fact sheet ──▶ LLM draft ──▶ claim validator ──┬─▶ ship
@@ -45,7 +49,7 @@ You'll see the fact sheet, attempt 1 failing with a flagged sentence, attempt 2 
 the final output. Then:
 
 ```bash
-python3 evals/run_evals.py          # 11 validator cases, exit 1 on any failure
+python3 evals/run_evals.py          # 18 validator cases (2 pinned limitations), exit 1 on any failure
 pip install pytest && pytest -q     # unit tests
 ```
 
@@ -107,8 +111,28 @@ call `validate` on it before showing it to a user.
 | Percent change | "sessions were up **16%**" | Compared to actual within ±1.5 points |
 | Level, not change | "conversion rate **of 3.2%**", "from 4.1%" | Recognized by preceding word; skipped |
 | Multiple metrics per sentence | "revenue climbed while CPA rose" | Each claim attaches to the nearest preceding metric |
+| Negation | "signups **did not** grow" | Negator within 3 words inverts up/down; negated "flat" is dropped, not guessed |
+| Percent before its metric | "a 16% rise **in sessions**" | Attaches forward when only a change-noun + preposition sits between them |
 
 Run `python3 evals/run_evals.py` to see each of these exercised.
+
+## Known limitations
+
+The gate is rules, so it has a boundary. These are pinned in `evals/cases.json` as
+`known_limitation: true` so they stay visible rather than quietly assumed away:
+
+- **Spelled-out numbers.** "up forty percent" isn't parsed; a wrong value passes.
+- **Implicit subjects.** "Sessions set a new high. It fell sharply." — the second sentence has
+  no metric mention, so the claim can't be attributed and is skipped.
+- **Metrics it doesn't know.** Anything outside the fact sheet's alias table is invisible. Safe
+  for a report that must only restate given data; not a general fact-checker.
+- **Causal and comparative language.** "because", "driven by", "outpaced" aren't adjudicated.
+- **False positives route to the fallback.** A correct draft the rules misread ships as the
+  plain template. That's the safe direction, but it lowers quality silently, so the eval set
+  matters as much for what it *doesn't* flag as for what it does.
+
+The next layer up — a model-based judge for tone, causality, and the cases above — can sit
+behind this gate. It should not replace it.
 
 ## What it deliberately doesn't do
 
